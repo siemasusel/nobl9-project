@@ -1,29 +1,16 @@
-# syntax=docker/dockerfile:1
+FROM golang:1.20
 
-# Build the application from source
-FROM golang:1.20.6 AS build-stage
+WORKDIR /usr/src/app
 
-
-# Set destination for COPY
-WORKDIR /app
-
-# Download Go modules
+# pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./
-RUN go mod download
+RUN go mod download && go mod verify
 
-# Copy the source code. Note the slash at the end, as explained in
-# https://docs.docker.com/engine/reference/builder/#copy
-COPY *.go ./
+COPY . .
+RUN go build -v -o /usr/local/bin/app stddevapi/cmd
 
-# Build
-RUN CGO_ENABLED=0 GOOS=linux go build -o /nolb9-project
-
-# Optional:
-# To bind to a TCP port, runtime parameters must be supplied to the docker command.
-# But we can document in the Dockerfile what ports
-# the application is going to listen on by default.
-# https://docs.docker.com/engine/reference/builder/#expose
 EXPOSE 8080
 
-# Run
-CMD ["/nolb9-project"]
+ENV RANDOMORG_API_KEY="098c2e44-7ac0-4258-b8f6-9a117039e177"
+
+CMD ["app"]
