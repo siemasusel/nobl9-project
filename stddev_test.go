@@ -22,7 +22,7 @@ func TestCalculateStdDev(t *testing.T) {
 	}
 
 	type fields struct {
-		client func(t *testing.T) *mock.MockRandomBackend
+		mockRandomBackend func(*mock.MockRandomBackend)
 	}
 
 	cases := []struct {
@@ -56,10 +56,8 @@ func TestCalculateStdDev(t *testing.T) {
 				},
 			},
 			fields: fields{
-				client: func(t *testing.T) *mock.MockRandomBackend {
-					m := mock.NewMockRandomBackend(gomock.NewController(t))
+				mockRandomBackend: func(m *mock.MockRandomBackend) {
 					m.EXPECT().GetRandomIntegers(gomock.Any(), 5).Return([]int{1, 2, 3, 4, 5}, nil).Times(2)
-					return m
 				},
 			},
 		},
@@ -97,17 +95,14 @@ func TestCalculateStdDev(t *testing.T) {
 				},
 			},
 			fields: fields{
-				client: func(t *testing.T) *mock.MockRandomBackend {
-					m := mock.NewMockRandomBackend(gomock.NewController(t))
+				mockRandomBackend: func(m *mock.MockRandomBackend) {
 					m.EXPECT().GetRandomIntegers(gomock.Any(), 4).Return([]int{758071, 606843, 43914, 455915}, nil).Times(1)
 					m.EXPECT().GetRandomIntegers(gomock.Any(), 4).Return([]int{567707, 308842, 940701, 888198}, nil).Times(1)
-
-					return m
 				},
 			},
 		},
 		{
-			name: "validation error",
+			name: "validation error from random backend",
 			args: args{
 				requests: 2,
 				length:   4,
@@ -116,19 +111,40 @@ func TestCalculateStdDev(t *testing.T) {
 				isErr: IsValidationError,
 			},
 			fields: fields{
-				client: func(t *testing.T) *mock.MockRandomBackend {
-					m := mock.NewMockRandomBackend(gomock.NewController(t))
+				mockRandomBackend: func(m *mock.MockRandomBackend) {
 					m.EXPECT().GetRandomIntegers(gomock.Any(), 4).Return(nil, NewValidationError(nil, "test error")).Times(2)
-
-					return m
 				},
+			},
+		},
+		{
+			name: "negative requests",
+			args: args{
+				requests: -5,
+				length:   4,
+			},
+			want: want{
+				isErr: IsValidationError,
+			},
+		},
+		{
+			name: "negative length",
+			args: args{
+				requests: 2,
+				length:   -5,
+			},
+			want: want{
+				isErr: IsValidationError,
 			},
 		},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := Service{randBackend: tt.fields.client(t)}
+			m := mock.NewMockRandomBackend(gomock.NewController(t))
+			if tt.fields.mockRandomBackend != nil {
+				tt.fields.mockRandomBackend(m)
+			}
+			svc := Service{randBackend: m}
 
 			res, err := svc.CalculateStdDev(context.Background(), tt.args.requests, tt.args.length)
 			if tt.want.isErr == nil {
